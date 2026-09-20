@@ -1,0 +1,21 @@
+product_id,name,product_type,price_usd,length_ft,width_ft,image_path
+KOH-TL-001,Kohler Veil Wall-Hung Toilet,toilet,1250.0,2.2,1.5,https://upload.wikimedia.org/wikipedia/commons/4/48/Toilet_icon.png
+KOH-TL-002,Kohler San Souci One-Piece Toilet,toilet,780.0,2.3,1.4,https://upload.wikimedia.org/wikipedia/commons/4/48/Toilet_icon.png
+KOH-TL-003,Kohler Numi 2.0 Smart Toilet,toilet,3200.0,2.1,1.6,https://upload.wikimedia.org/wikipedia/commons/4/48/Toilet_icon.png
+KOH-TL-004,Kohler Cimarron Elongated Toilet,toilet,450.0,2.4,1.5,https://upload.wikimedia.org/wikipedia/commons/4/48/Toilet_icon.png
+KOH-VN-001,Kohler Southerk 36-Inch Vanity,vanity,1100.0,3.0,1.8,https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/Grid_structure.svg/512px-Grid_structure.svg.png
+KOH-VN-002,Kohler Jacquard 60-Inch Double Vanity,vanity,2400.0,5.0,2.0,https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/Grid_structure.svg/512px-Grid_structure.svg.png
+KOH-VN-003,Kohler Harken 24-Inch Compact Vanity,vanity,650.0,2.0,1.5,https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/Grid_structure.svg/512px-Grid_structure.svg.png
+KOH-SK-001,Kohler Vox Rectangular Vessel Sink,sink,290.0,1.8,1.3,https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/Grid_structure.svg/512px-Grid_structure.svg.png
+KOH-SK-002,Kohler Caxton Undermount Sink,sink,180.0,1.6,1.2,https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/Grid_structure.svg/512px-Grid_structure.svg.png
+KOH-SH-001,Kohler DTV Digital Shower System,shower,1850.0,4.0,3.5,https://upload.wikimedia.org/wikipedia/commons/thumb/b/b7/Shower_icon.svg/512px-Shower_icon.svg.png
+KOH-SH-002,Kohler LuxStone Walk-In Shower,shower,2600.0,5.0,3.0,https://upload.wikimedia.org/wikipedia/commons/thumb/b/b7/Shower_icon.svg/512px-Shower_icon.svg.png
+KOH-SH-003,Kohler Choreograph Square Shower Enclosure,shower,1200.0,3.0,3.0,https://upload.wikimedia.org/wikipedia/commons/thumb/b/b7/Shower_icon.svg/512px-Shower_icon.svg.png
+KOH-TB-001,Kohler Artifacts Oval Freestanding Tub,tub,3100.0,5.5,2.8,https://upload.wikimedia.org/wikipedia/commons/thumb/b/b7/Shower_icon.svg/512px-Shower_icon.svg.png
+KOH-TB-002,Kohler Archer Alcove Soaking Tub,tub,950.0,5.0,2.6,https://upload.wikimedia.org/wikipedia/commons/thumb/b/b7/Shower_icon.svg/512px-Shower_icon.svg.png
+KOH-FC-001,Kohler Purist Widespread Faucet,faucet,420.0,0.8,0.6,https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/Faucet_icon.png/512px-Faucet_icon.png
+KOH-FC-002,Kohler Composed Brass Faucet,faucet,350.0,0.7,0.5,https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/Faucet_icon.png/512px-Faucet_icon.png
+KOH-FC-003,Kohler Artifacts Tall Bathroom Faucet,faucet,510.0,0.9,0.6,https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/Faucet_icon.png/512px-Faucet_icon.png
+KOH-MR-001,Kohler Verdera Voice Smart Lighted Mirror,mirror,650.0,2.5,0.3,https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/Grid_structure.svg/512px-Grid_structure.svg.png
+KOH-MR-002,Kohler Essential Frameless Rectangular Mirror,mirror,210.0,2.0,0.2,https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/Grid_structure.svg/512px-Grid_structure.svg.png
+KOH-AC-001,Kohler Purist Hotelier Towel Rack,accessory,160.0,2.0,0.8,https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/Grid_structure.svg/512px-Grid_structure.svg.png
