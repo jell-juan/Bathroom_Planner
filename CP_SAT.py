@@ -12,12 +12,15 @@ class KohlerCPSATOptimizer:
         actual_catalog: pd.DataFrame,
         usable_area_ratio: float = 0.40,  # Max 40% room floor occupancy
     ):
-        self.rag_output = rag_output
-        self.budget = hard_constraints.get("budget", None)
+        self.rag_output = rag_output or {}
+        # Normalize budget: ensure it is float/int or float('inf') rather than None
+        raw_budget = hard_constraints.get("budget", None)
+        self.budget = float(raw_budget) if raw_budget is not None else float("inf")
+        
         self.required_categories = hard_constraints.get("required_products", [])
         self.room_dimensions = hard_constraints.get("room_dimensions", None)  # [length_ft, width_ft]
-        self.candidates = rag_output.get("recommendations", [])
-        self.actual_catalog = actual_catalog.copy()
+        self.candidates = self.rag_output.get("recommendations", [])
+        self.actual_catalog = actual_catalog.copy() if actual_catalog is not None else pd.DataFrame()
         self.usable_area_ratio = usable_area_ratio
 
         self.df = pd.DataFrame(self.candidates)
@@ -25,8 +28,7 @@ class KohlerCPSATOptimizer:
     def _extract_dimensions_sqft(
         self, catalog_item: pd.Series
     ) -> tuple[float, float, float]:
-        """Extracts product dimensions with fallback across all standard catalog naming conventions."""
-        # 1. Flexible key lookup across common CSV column names
+        """Extracts product dimensions with fallback across standard catalog naming conventions."""
         len_keys = ["length_inches", "length_in", "length", "depth_inches", "depth_in", "depth"]
         wid_keys = ["width_inches", "width_in", "width", "span_inches", "span"]
 
@@ -61,7 +63,18 @@ class KohlerCPSATOptimizer:
     def optimize(self) -> dict:
         if self.df.empty:
             print("[WARNING] No candidates passed to CP-SAT Optimizer.")
-            return {"status": "No Candidates", "selected_products": []}
+            return {
+                "status": "No Candidates",
+                "total_cost": 0,
+                "budget_limit": 0 if self.budget == float("inf") else self.budget,
+                "spatial_metrics": {
+                    "room_dimensions_ft": self.room_dimensions or [0.0, 0.0],
+                    "total_room_area_sqft": 0.0,
+                    "used_area_sqft": 0.0,
+                    "usable_area_limit_sqft": 0.0,
+                },
+                "selected_products": [],
+            }
 
         model = cp_model.CpModel()
 
@@ -70,14 +83,12 @@ class KohlerCPSATOptimizer:
         for i, row in self.df.iterrows():
             x[i] = model.NewBoolVar(f"select_{row['product_id']}_{row['category']}")
 
-        # Step 2: Category Matching (At most 1 per category, exactly 1 for required categories present)
+        # Step 2: Category Matching
         for category in set(self.df["category"].unique()):
             cat_indices = self.df[self.df["category"] == category].index.tolist()
             if category in self.required_categories:
-                # Require exactly 1 product from this category
                 model.Add(sum(x[idx] for idx in cat_indices) == 1)
             else:
-                # Optional categories: select at most 1
                 model.Add(sum(x[idx] for idx in cat_indices) <= 1)
 
         # Step 3: Extract Prices and Dimensions
@@ -85,14 +96,15 @@ class KohlerCPSATOptimizer:
         product_dims = []
 
         for _, row in self.df.iterrows():
-            matched_item = self.actual_catalog[
-                self.actual_catalog["product_id"] == row["product_id"]
-            ]
+            matched_item = (
+                self.actual_catalog[self.actual_catalog["product_id"] == row["product_id"]]
+                if not self.actual_catalog.empty
+                else pd.DataFrame()
+            )
 
             if not matched_item.empty:
                 item_series = matched_item.iloc[0]
 
-                # Price lookup with fallbacks
                 price_val = item_series.get("price_usd", item_series.get("price", 0.0))
                 try:
                     prices.append(int(float(price_val)))
@@ -106,43 +118,44 @@ class KohlerCPSATOptimizer:
                 product_dims.append((2.0, 1.5, 3.0))
 
         # Step 4: Budget Limit
-        if self.budget is not None and self.budget > 0:
+        if self.budget != float("inf") and self.budget > 0:
             model.Add(
                 sum(x[i] * prices[i] for i in range(len(self.df))) <= int(self.budget)
             )
 
         # Step 5: Spatial Feasibility
-        room_area_sqft = None
+        room_area_sqft = 0.0
         if self.room_dimensions and len(self.room_dimensions) == 2:
-            room_len_ft = float(self.room_dimensions[0])
-            room_wid_ft = float(self.room_dimensions[1])
-            room_area_sqft = room_len_ft * room_wid_ft
+            try:
+                room_len_ft = float(self.room_dimensions[0])
+                room_wid_ft = float(self.room_dimensions[1])
+                room_area_sqft = room_len_ft * room_wid_ft
 
-            max_usable_area_sqft = room_area_sqft * self.usable_area_ratio
+                max_usable_area_sqft = room_area_sqft * self.usable_area_ratio
 
-            for i in range(len(self.df)):
-                p_len_ft, p_wid_ft, _ = product_dims[i]
+                for i in range(len(self.df)):
+                    p_len_ft, p_wid_ft, _ = product_dims[i]
 
-                fits_normal = (p_len_ft <= room_len_ft) and (p_wid_ft <= room_wid_ft)
-                fits_rotated = (p_wid_ft <= room_len_ft) and (p_len_ft <= room_wid_ft)
+                    fits_normal = (p_len_ft <= room_len_ft) and (p_wid_ft <= room_wid_ft)
+                    fits_rotated = (p_wid_ft <= room_len_ft) and (p_len_ft <= room_wid_ft)
 
-                # If item physically exceeds room boundaries in both orientations, disable it
-                if not (fits_normal or fits_rotated):
-                    model.Add(x[i] == 0)
+                    if not (fits_normal or fits_rotated):
+                        model.Add(x[i] == 0)
 
-            # Footprint Area Limit
-            scaled_areas = [int(dims[2] * 100) for dims in product_dims]
-            scaled_max_area = int(max_usable_area_sqft * 100)
+                scaled_areas = [int(dims[2] * 100) for dims in product_dims]
+                scaled_max_area = int(max_usable_area_sqft * 100)
 
-            model.Add(
-                sum(x[i] * scaled_areas[i] for i in range(len(self.df)))
-                <= scaled_max_area
-            )
+                model.Add(
+                    sum(x[i] * scaled_areas[i] for i in range(len(self.df)))
+                    <= scaled_max_area
+                )
+            except (ValueError, TypeError):
+                room_area_sqft = 0.0
 
-        # Step 6: Objective Function (Maximize Similarity)
+        # Step 6: Objective Function
         scale_factor = 10000
         similarities = [
-            int(row.get("similarity_score", 0.5) * scale_factor)
+            int(float(row.get("similarity_score", 0.5) or 0.5) * scale_factor)
             for _, row in self.df.iterrows()
         ]
         model.Maximize(sum(x[i] * similarities[i] for i in range(len(self.df))))
@@ -170,7 +183,7 @@ class KohlerCPSATOptimizer:
                         "length_ft": round(p_len, 2),
                         "width_ft": round(p_wid, 2),
                         "area_sqft": round(p_area, 2),
-                        "similarity_score": row.get("similarity_score", 0.0),
+                        "similarity_score": float(row.get("similarity_score", 0.0) or 0.0),
                         "reason": row.get("reason", "Optimal candidate selection"),
                     })
                     total_cost += prices[i]
@@ -179,17 +192,25 @@ class KohlerCPSATOptimizer:
             return {
                 "status": "Optimal Bundle Found",
                 "total_cost": total_cost,
-                "budget_limit": self.budget,
+                "budget_limit": 0 if self.budget == float("inf") else self.budget,
                 "spatial_metrics": {
-                    "room_dimensions_ft": self.room_dimensions,
-                    "total_room_area_sqft": round(room_area_sqft, 2) if room_area_sqft else None,
+                    "room_dimensions_ft": self.room_dimensions or [0.0, 0.0],
+                    "total_room_area_sqft": round(room_area_sqft, 2),
                     "used_area_sqft": round(total_area_used, 2),
-                    "usable_area_limit_sqft": round(room_area_sqft * self.usable_area_ratio, 2) if room_area_sqft else None,
+                    "usable_area_limit_sqft": round(room_area_sqft * self.usable_area_ratio, 2),
                 },
                 "selected_products": selected_items,
             }
         else:
             return {
                 "status": "Infeasible - Constraints could not be satisfied simultaneously.",
+                "total_cost": 0,
+                "budget_limit": 0 if self.budget == float("inf") else self.budget,
+                "spatial_metrics": {
+                    "room_dimensions_ft": self.room_dimensions or [0.0, 0.0],
+                    "total_room_area_sqft": round(room_area_sqft, 2),
+                    "used_area_sqft": 0.0,
+                    "usable_area_limit_sqft": round(room_area_sqft * self.usable_area_ratio, 2),
+                },
                 "selected_products": [],
             }

@@ -1,7 +1,9 @@
 import json
 import re
 import math
+import os
 from llama_cpp import Llama
+from huggingface_hub import hf_hub_download
 
 # ==========================================================
 # HARDENED SYSTEM PROMPT
@@ -49,6 +51,15 @@ Output:
     "required_products": ["shower"],
     "preference_sequence": ["minimalist"]
 }
+
+User: "add a shower to it"
+Output:
+{
+    "budget": null,
+    "room_dimensions": null,
+    "required_products": ["shower"],
+    "preference_sequence": []
+}
 """
 
 
@@ -59,6 +70,25 @@ Output:
 class SmolLMJSONExtractor:
 
     def __init__(self, model_path: str = "Qwen2.5-1.5B-Instruct-Q4_K_M.gguf"):
+        # Auto-download the GGUF model from Hugging Face if not present locally
+        if not os.path.exists(model_path):
+            print(f"[INFO] Model file '{model_path}' not found locally.")
+            print("[INFO] Downloading Qwen2.5-1.5B GGUF file from Hugging Face...")
+            
+            # Extract target folder and filename from model_path
+            target_dir = os.path.dirname(os.path.abspath(model_path))
+            filename = os.path.basename(model_path)
+            
+            model_path = hf_hub_download(
+                repo_id="bartowski/Qwen2.5-1.5B-Instruct-GGUF",
+                filename=filename,
+                local_dir=target_dir if target_dir else ".",
+                local_dir_use_symlinks=False
+            )
+            print(f"[SUCCESS] Download completed: {model_path}")
+        else:
+            print(f"[INFO] Found existing model file at: {model_path}")
+
         print(f"[INFO] Loading quantized GGUF model from {model_path}...")
         self.llm = Llama(
             model_path=model_path,
@@ -71,12 +101,21 @@ class SmolLMJSONExtractor:
     def _normalize_dimensions(self, parsed_data: dict) -> dict:
         """Fixes area vs side-length parsing errors (e.g. [100, 100] -> [10, 10])"""
         dims = parsed_data.get("room_dimensions")
+        
+        # Safely validate that dims is a 2-element list containing numbers
         if dims and isinstance(dims, list) and len(dims) == 2:
             length, width = dims[0], dims[1]
-            # If both dimensions are identical and unnaturally large for a standard bathroom dimension (>25ft)
-            if length == width and length >= 25:
-                side = round(math.sqrt(length), 1)
-                parsed_data["room_dimensions"] = [side, side]
+            
+            # Ensure both values are valid numbers (not None or strings) before comparing
+            if isinstance(length, (int, float)) and isinstance(width, (int, float)):
+                if length == width and length >= 25:
+                    side = round(math.sqrt(length), 1)
+                    parsed_data["room_dimensions"] = [side, side]
+            else:
+                parsed_data["room_dimensions"] = None
+        else:
+            parsed_data["room_dimensions"] = None
+            
         return parsed_data
 
     def generate_json(

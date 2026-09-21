@@ -33,7 +33,7 @@ def load_image_cached(image_path: str) -> Optional[Image.Image]:
 
 
 class Bathroom2DVisualizer:
-    """Production-ready 2D floorplan visualizer[cite: 5]."""
+    """Production-ready 2D floorplan visualizer with safe dimension extraction."""
     
     CATEGORY_CONFIG = {
         "shower": {"color": "#E3F2FD", "edge": "#1E88E5", "anchor": "corner_top_left"},
@@ -45,28 +45,50 @@ class Bathroom2DVisualizer:
         "mirror": {"color": "#FFFDE7", "edge": "#FDD835", "anchor": "wall_top"}
     }
 
-    def __init__(self, room_dimensions: Tuple[float, float], dpi: int = 80, fast_vector_mode: bool = False):
-        # Sanity check dimensions to prevent zero/massive scale bugs
-        length = float(room_dimensions[0]) if room_dimensions and room_dimensions[0] else 10.0
-        width = float(room_dimensions[1]) if room_dimensions and room_dimensions[1] else 10.0
+    def __init__(self, room_dimensions: Tuple[Optional[float], Optional[float]], dpi: int = 80, fast_vector_mode: bool = False):
+        # Sanity check room dimensions safely against NoneType
+        raw_length = room_dimensions[0] if (room_dimensions and len(room_dimensions) > 0 and room_dimensions[0] is not None) else 10.0
+        raw_width = room_dimensions[1] if (room_dimensions and len(room_dimensions) > 1 and room_dimensions[1] is not None) else 10.0
+
+        try:
+            length = float(raw_length)
+        except (ValueError, TypeError):
+            length = 10.0
+
+        try:
+            width = float(raw_width)
+        except (ValueError, TypeError):
+            width = 10.0
         
-        # Clamp dimensions between 4ft and 50ft
+        # Clamp room dimensions between 4ft and 50ft
         self.room_length = min(max(length, 4.0), 50.0)
         self.room_width = min(max(width, 4.0), 50.0)
         self.dpi = dpi
         self.fast_vector_mode = fast_vector_mode
 
-    def _extract_dimensions(self, item: Dict[str, Any]) -> Tuple[float, float]:
-        p_len = item.get("length_ft")
-        p_wid = item.get("width_ft")
+    def _safe_float(self, val: Any) -> Optional[float]:
+        """Safely converts a value to float, returning None if invalid or NoneType."""
+        if val is None:
+            return None
+        try:
+            f_val = float(val)
+            return f_val if f_val > 0 else None
+        except (ValueError, TypeError):
+            return None
 
-        if (p_len is None or p_len == 0) and "dimensions_ft" in item:
+    def _extract_dimensions(self, item: Dict[str, Any]) -> Tuple[float, float]:
+        p_len = self._safe_float(item.get("length_ft"))
+        p_wid = self._safe_float(item.get("width_ft"))
+
+        if (p_len is None or p_wid is None) and "dimensions_ft" in item:
             dims = item.get("dimensions_ft")
             if isinstance(dims, (list, tuple)) and len(dims) >= 2:
-                p_len, p_wid = dims[0], dims[1]
+                p_len = p_len or self._safe_float(dims[0])
+                p_wid = p_wid or self._safe_float(dims[1])
 
-        if not p_len or p_len == 0 or not p_wid or p_wid == 0:
-            category = str(item.get("category", "")).lower()
+        # Apply standard item fallbacks if dimensions are still missing/invalid
+        if p_len is None or p_wid is None:
+            category = str(item.get("category", item.get("product_type", ""))).lower()
             defaults = {
                 "sink": (2.0, 1.5),
                 "vanity": (4.0, 2.0),
@@ -76,10 +98,13 @@ class Bathroom2DVisualizer:
                 "mirror": (2.5, 2.0),
                 "faucet": (1.0, 1.0)
             }
-            p_len, p_wid = defaults.get(category, (2.0, 2.0))
+            def_len, def_wid = defaults.get(category, (2.0, 2.0))
+            p_len = p_len if p_len is not None else def_len
+            p_wid = p_wid if p_wid is not None else def_wid
 
-        p_len = max(0.5, min(float(p_len), self.room_length - 0.5))
-        p_wid = max(0.5, min(float(p_wid), self.room_width - 0.5))
+        # Guaranteed float comparison and bounds clamping
+        p_len = max(0.5, min(p_len, self.room_length - 0.5))
+        p_wid = max(0.5, min(p_wid, self.room_width - 0.5))
         
         return p_len, p_wid
 
@@ -205,5 +230,5 @@ class Bathroom2DVisualizer:
     def render_to_file(self, products: List[Dict[str, Any]], output_filepath: str = "bathroom_2d_layout.png") -> str:
         fig = self.generate_figure(products)
         fig.savefig(output_filepath, bbox_inches='tight', dpi=self.dpi)
-        plt.close(fig)  # Prevents memory accumulation across runs[cite: 4]
+        plt.close(fig)  # Prevents memory accumulation across runs
         return output_filepath
