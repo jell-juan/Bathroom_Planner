@@ -1,6 +1,9 @@
-from sentence_transformers import SentenceTransformer
-from torch import nn
+import os
 import torch
+import torch.nn as nn
+import torch.optim as optim
+import pandas as pd
+from sentence_transformers import SentenceTransformer
 
 # =====================================================================
 # LSTM Preference Encoder
@@ -14,16 +17,6 @@ class LSTMPreferenceEncoder(nn.Module):
         num_layers: int = 1,
         bidirectional: bool = False
     ):
-        """
-        Initializes the LSTM Preference Encoder.
-
-        Args:
-            embedding_model_name (str): SentenceTransformer model name to convert text to vectors.
-            embedding_dim (int): Dimensionality of the sentence embeddings (384 for all-MiniLM-L6-v2).
-            hidden_dim (int): The number of features in the LSTM hidden state.
-            num_layers (int): Number of recurrent layers.
-            bidirectional (bool): If True, becomes a bidirectional LSTM.
-        """
         super(LSTMPreferenceEncoder, self).__init__()
 
         # Initialize the Sentence Transformer
@@ -51,44 +44,107 @@ class LSTMPreferenceEncoder(nn.Module):
             embedding_dim,
             128
         )
+
     def create_embeddings(self, preferences: list) -> torch.Tensor:
-        """
-        Converts a list of preference text strings into a tensor of dense embeddings.
-
-        Args:
-            preferences (list of str): Ex. ["modern styling", "matte black fixtures"]
-
-        Returns:
-            torch.Tensor: Shape (1, seq_len, embedding_dim)
-        """
         if not preferences:
-            # Return a zero tensor if preferences are empty
             return torch.zeros((1, 1, self.embedding_dim))
 
-        # Generate sentence embeddings
         embeddings_np = self.embedding_model.encode(preferences)
         embeddings_tensor = torch.tensor(embeddings_np, dtype=torch.float32)
-
-        # Reshape to (batch_size=1, sequence_length, embedding_dim)
         return embeddings_tensor.unsqueeze(0)
 
     def forward(self, preference_embeddings: torch.Tensor) -> torch.Tensor:
-        """
-        Feeds the sequence of embeddings through the LSTM to produce a single aggregated preference vector.
-
-        Args:
-            preference_embeddings (torch.Tensor): Shape (batch_size, seq_len, embedding_dim)
-
-        Returns:
-            torch.Tensor: Output representation from the final step of the LSTM.
-                          Shape: (batch_size, hidden_dim * 2 if bidirectional else hidden_dim)
-        """
-        # LSTM output: (batch, seq_len, num_directions * hidden_dim)
-        # hn: (num_layers * num_directions, batch, hidden_dim)
         lstm_out, (hn, cn) = self.lstm(preference_embeddings)
-
-        # Retrieve the final sequential output representing the entire preference context
         final_vector = lstm_out[:, -1, :]
         final_vector = self.projection(final_vector)
-
         return final_vector
+
+    def fit_from_catalog(self, catalog_csv_path: str, save_checkpoint_path: str, epochs: int = 10, lr: float = 1e-3):
+        """
+        Trains the projection/LSTM weights using self-supervised contrastive learning
+        from textual features in kohler_catalog.csv when no checkpoint exists.
+        """
+        print(f"[INFO] Checkpoint not found. Auto-training LSTM Encoder from '{catalog_csv_path}'...")
+        
+        if not os.path.exists(catalog_csv_path):
+            raise FileNotFoundError(f"[ERROR] Catalog CSV file '{catalog_csv_path}' not found!")
+
+        df = pd.read_csv(catalog_csv_path).fillna("")
+        
+        # Extract descriptive text columns to construct preference sentences
+        text_data = []
+        for _, row in df.iterrows():
+            combined_text = " ".join([
+                str(row.get(col, "")) for col in ["product_type", "style", "finish", "description", "title"]
+                if col in row and str(row[col])
+            ])
+            if combined_text.strip():
+                text_data.append(combined_text.strip())
+
+        if not text_data:
+            text_data = ["standard modern fixture", "matte black bathroom finish", "contemporary style unit"]
+
+        # Encode text data into sequence representations
+        print(f"[INFO] Encoding {len(text_data)} catalog descriptions for training...")
+        embeddings_np = self.embedding_model.encode(text_data)
+        embeddings_tensor = torch.tensor(embeddings_np, dtype=torch.float32)
+
+        # Self-supervised contrastive optimization loop
+        optimizer = optim.Adam(self.parameters(), lr=lr)
+        criterion = nn.MSELoss()
+        device = next(self.parameters()).device
+
+        self.train()
+        for epoch in range(epochs):
+            total_loss = 0.0
+            for i in range(0, len(embeddings_tensor), 32):  # batch_size=32
+                batch = embeddings_tensor[i:i+32].to(device)
+                if batch.shape[0] < 2:
+                    continue
+
+                # Prepare input as sequence (batch_size, seq_len=1, embedding_dim)
+                inputs = batch.unsqueeze(1)
+                
+                # Target: Product projection target representation
+                target_rep = self.product_projection(batch)
+                
+                # Forward through LSTM & Projection
+                output_rep = self(inputs)
+
+                loss = criterion(output_rep, target_rep)
+
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+
+                total_loss += loss.item()
+
+            print(f"[TRAIN] Epoch {epoch + 1}/{epochs} - Loss: {total_loss:.4f}")
+
+        # Save trained weights
+        torch.save(self.state_dict(), save_checkpoint_path)
+        print(f"[INFO] Training complete! Saved checkpoint to '{save_checkpoint_path}'")
+
+    @classmethod
+    def load_or_train(
+        cls,
+        checkpoint_path: str,
+        catalog_csv_path: str = "kohler_catalog.csv",
+        device: str = "cpu",
+        **kwargs
+    ):
+        """
+        Loads the checkpoint if present. Trains from catalog_csv_path and saves to checkpoint_path if missing.
+        """
+        model = cls(**kwargs)
+        model.to(device)
+
+        if os.path.exists(checkpoint_path):
+            print(f"[INFO] Loading existing LSTM checkpoint from '{checkpoint_path}'...")
+            state_dict = torch.load(checkpoint_path, map_location=device)
+            model.load_state_dict(state_dict)
+        else:
+            model.fit_from_catalog(catalog_csv_path=catalog_csv_path, save_checkpoint_path=checkpoint_path)
+
+        model.eval()
+        return model
