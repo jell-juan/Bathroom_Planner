@@ -55,19 +55,21 @@ def merge_requirements(current_state: dict, turn_extraction: dict) -> dict:
 def initialize_models(catalog_df: pd.DataFrame):
     """
     Loads all required models into memory once.
+    Auto-trains missing checkpoint (.pth) and missing vectors (.npy) automatically.
     """
     print("[INFO] Initializing SmolLM JSON Extractor...")
     json_extractor = SmolLMJSONExtractor()
 
     print("[INFO] Initializing LSTM Preference Encoder...")
-    encoder = LSTMPreferenceEncoder()
-    state_dict = torch.load(LSTM_CHECKPOINT, map_location=DEVICE)
-    encoder.load_state_dict(state_dict)
-    encoder.to(DEVICE)
-    encoder.eval()
-    print("[INFO] LSTM checkpoint loaded successfully.")
+    # Load checkpoint if available, or auto-train from CATALOG_PATH if missing
+    encoder = LSTMPreferenceEncoder.load_or_train(
+        checkpoint_path=LSTM_CHECKPOINT,
+        catalog_csv_path=CATALOG_PATH,
+        device=DEVICE
+    )
 
     print("[INFO] Initializing Local Vector Space RAG Engine...")
+    # RAG class auto-generates product_vectors.npy if missing
     rag_engine = LocalVectorSpaceRAG(
         catalog_df=catalog_df,
         encoder_model=encoder,
