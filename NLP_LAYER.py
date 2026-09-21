@@ -1,7 +1,9 @@
 import json
 import re
 import math
+import os
 from llama_cpp import Llama
+from huggingface_hub import hf_hub_download
 
 # ==========================================================
 # HARDENED SYSTEM PROMPT
@@ -59,6 +61,25 @@ Output:
 class SmolLMJSONExtractor:
 
     def __init__(self, model_path: str = "Qwen2.5-1.5B-Instruct-Q4_K_M.gguf"):
+        # Auto-download the GGUF model from Hugging Face if not present locally
+        if not os.path.exists(model_path):
+            print(f"[INFO] Model file '{model_path}' not found locally.")
+            print("[INFO] Downloading Qwen2.5-1.5B GGUF file from Hugging Face...")
+            
+            # Extract target folder and filename from model_path
+            target_dir = os.path.dirname(os.path.abspath(model_path))
+            filename = os.path.basename(model_path)
+            
+            model_path = hf_hub_download(
+                repo_id="bartowski/Qwen2.5-1.5B-Instruct-GGUF",
+                filename=filename,
+                local_dir=target_dir if target_dir else ".",
+                local_dir_use_symlinks=False
+            )
+            print(f"[SUCCESS] Download completed: {model_path}")
+        else:
+            print(f"[INFO] Found existing model file at: {model_path}")
+
         print(f"[INFO] Loading quantized GGUF model from {model_path}...")
         self.llm = Llama(
             model_path=model_path,
