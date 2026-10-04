@@ -15,6 +15,7 @@ An intelligent, spatial-aware AI design assistant built for **Track 1 of the KOH
 ---
 
 ## Architecture Overview
+```text
 
 [ User Input Query ]
 │
