@@ -1,6 +1,6 @@
-# KOHLER AI Bathroom Designer & Planner
+# AI Bathroom Designer & Planner
 
-An intelligent, spatial-aware AI design assistant built for **Track 1 of the KOHLER-MITWPU AI Research Lab Case Study**. The system combines Natural Language Processing, Sequential Preference Encoders, Vector RAG Search, and Deterministic CP-SAT Constraint Optimization to recommend fully compatible, budget-optimized, and spatially feasible Kohler bathroom product bundles.
+An intelligent, spatial-aware AI design assistant built for **Track 1 of the KOHLER-MITWPU AI Research Lab Case Study**. The system combines Natural Language Processing, Sequential Preference Encoders, Vector RAG Search, and Deterministic CP-SAT Constraint Optimization to recommend fully compatible, budget-optimized, and spatially feasible bathroom product bundles.
 
 ---
 
@@ -16,7 +16,6 @@ An intelligent, spatial-aware AI design assistant built for **Track 1 of the KOH
 
 ## Architecture Overview
 
-```text
 [ User Input Query ]
 │
 ▼
