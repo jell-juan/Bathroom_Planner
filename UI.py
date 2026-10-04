@@ -7,27 +7,27 @@ import streamlit as st
 # Import your existing pipeline functions/classes from main.py / pipeline
 from main import (
     Bathroom2DVisualizer,
-    KohlerCPSATOptimizer,
+    CPSATOptimizer,
     initialize_models,
 )
 
-# KOHLER | AI Bathroom Design & Spatial Planner
+# AI Bathroom Design & Spatial Planner
 # To run:
-# 1. Windows CMD: `cd "C:\Users\adit2_w4j99bx\source\repos\KOHLER" && streamlit run UI.py`
-# 2. Windows PowerShell: `cd "C:\Users\adit2_w4j99bx\source\repos\KOHLER" ; streamlit run UI.py`
+# 1. Windows CMD: `cd "C:\Users\adit2_w4j99bx\source\repos\Bathroom_Planner" && streamlit run UI.py`
+# 2. Windows PowerShell: `cd "C:\Users\adit2_w4j99bx\source\repos\Bathroom_Planner" ; streamlit run UI.py`
 
 # -----------------------------------------------------------------------------
-# 1. PAGE CONFIGURATION & CUSTOM KOHLER SUSTAINABILITY THEME
+# 1. PAGE CONFIGURATION & CUSTOM SUSTAINABILITY THEME
 # -----------------------------------------------------------------------------
 st.set_page_config(
-    page_title="KOHLER | AI Bathroom Design & Spatial Planner",
+    page_title="AI Bathroom Design & Spatial Planner",
     page_icon="🌿",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# Kohler-inspired Sustainable Aesthetic
-KOHLER_CSS = """
+# Sustainable Aesthetic
+CSS = """
 <style>
     /* Highlighted Text Selection: Dark Shade of Brown */
     ::-selection {
@@ -184,13 +184,13 @@ KOHLER_CSS = """
     }
 </style>
 """
-st.markdown(KOHLER_CSS, unsafe_allow_html=True)
+st.markdown(CSS, unsafe_allow_html=True)
 
 
 # -----------------------------------------------------------------------------
 # 2. STATE & BACKEND CACHING
 # -----------------------------------------------------------------------------
-CATALOG_PATH = "kohler_catalog.csv"
+CATALOG_PATH = "catalog.csv"
 
 @st.cache_resource(show_spinner=False)
 def load_backend():
@@ -247,7 +247,7 @@ with st.sidebar:
             with st.expander("View Products in Bundle"):
                 products = item["bundle"].get("selected_products", [])
                 for p in products:
-                    p_name = p.get('product_name') or p.get('name') or 'Kohler Product'
+                    p_name = p.get('product_name') or p.get('name') or 'Product'
                     p_price = p.get('price_usd') or p.get('price') or 0
                     p_cat = p.get('category') or p.get('product_type') or 'Product'
                     st.markdown(f"- **{p_cat.title()}**: {p_name} (${p_price:,.2f})")
@@ -260,13 +260,13 @@ with st.sidebar:
 # -----------------------------------------------------------------------------
 # 4. MAIN LAYOUT & USER INPUT
 # -----------------------------------------------------------------------------
-# Kohler Brand Header
-st.markdown("<h2 style='color: #2C2A29; letter-spacing: 1px; font-weight: 300;'>KOHLER <span style='font-size: 16px; color: #2D4A3E;'>| Sustainable Design Intelligence</span></h2>", unsafe_allow_html=True)
+# Brand Header
+st.markdown("<h2 style='color: #2C2A29; letter-spacing: 1px; font-weight: 300;'>Bathroom Planner <span style='font-size: 16px; color: #2D4A3E;'>| Sustainable Design Intelligence</span></h2>", unsafe_allow_html=True)
 
 # Welcome Banner
 st.markdown("""
 <div class="welcome-card">
-    <div class="welcome-title">Welcome to Kohler AI Design Studio</div>
+    <div class="welcome-title">Welcome to AI Design Studio</div>
     <div class="welcome-subtitle">
         Transform your bathroom into a sustainable, modern sanctuary. Please describe your bathroom parameters below—including 
         <b>room dimensions</b> (e.g., 10x8 ft), <b>existing features or layout preferences</b>, <b>aesthetic theme</b>, and your <b>budget constraints</b>.
@@ -294,7 +294,7 @@ if submit_button:
     if not user_input.strip():
         st.warning("Please enter your bathroom details before generating.")
     else:
-        with st.spinner("Processing design request through Kohler AI Engine..."):
+        with st.spinner("Processing design request through AI Engine..."):
             try:
                 # Step 1: JSON Intent Extraction
                 extracted_json = json_extractor.generate_json(user_input)
@@ -321,7 +321,7 @@ if submit_button:
                 )
 
                 # Step 4: CP-SAT Optimization
-                optimizer = KohlerCPSATOptimizer(
+                optimizer = CPSATOptimizer(
                     rag_output=rag_output,
                     hard_constraints=hard_constraints,
                     actual_catalog=catalog_df,
@@ -378,7 +378,7 @@ if st.session_state.history:
             )
             
     with col2:
-        st.markdown("#### Selected Kohler Bundle")
+        st.markdown("#### Selected Bundle")
         bundle = latest_item["bundle"]
         products = bundle.get("selected_products", [])
         
@@ -389,7 +389,7 @@ if st.session_state.history:
         for p in products:
             with st.container():
                 p_category = p.get('category') or p.get('product_type') or 'Fixture'
-                p_name = p.get('product_name') or p.get('name') or 'Kohler Product'
+                p_name = p.get('product_name') or p.get('name') or 'Product'
                 
                 # Retrieve price safely across schemas
                 p_price = p.get('price_usd') or p.get('price') or 0.0

@@ -17,7 +17,7 @@ torch.set_num_threads(4)  # Match CPU physical core count
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 LSTM_CHECKPOINT = os.path.join(SCRIPT_DIR, "lstm_preference_encoder (1).pth")
-CATALOG_PATH = os.path.join(SCRIPT_DIR, "kohler_catalog.csv")
+CATALOG_PATH = os.path.join(SCRIPT_DIR, "catalog.csv")
 VECTORS_PATH = os.path.join(SCRIPT_DIR, "product_vectors (1).npy")
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"

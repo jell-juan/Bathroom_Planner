@@ -129,7 +129,7 @@ class LSTMPreferenceEncoder(nn.Module):
     def load_or_train(
         cls,
         checkpoint_path: str,
-        catalog_csv_path: str = "kohler_catalog.csv",
+        catalog_csv_path: str = "catalog.csv",
         device: str = "cpu",
         **kwargs
     ):

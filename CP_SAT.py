@@ -3,7 +3,7 @@ import pandas as pd
 from ortools.sat.python import cp_model
 
 
-class KohlerCPSATOptimizer:
+class CPSATOptimizer:
 
     def __init__(
         self,
